@@ -2,10 +2,13 @@ import requests
 from fpdf import FPDF
 from bs4 import BeautifulSoup as BS
 from os import makedirs
+from PIL import Image
+from typing import List
+from typing import Tuple
 
 
 def main():
-    makedirs("pdfs",exist_ok=True)
+    makedirs("pdfs", exist_ok=True)
     with open("links.txt", "r") as file:
         for entry in file.readlines():
             name, link = entry.split(";")
@@ -13,8 +16,8 @@ def main():
 
 
 def make_progress_bar(current, max):
-    perc = (100 * current) // max
-    return f"[{('|'*perc).ljust(100)}]"
+    perc = (50 * current) // max
+    return f"[{('|'*perc).ljust(50)}]"
 
 
 def handle_entry(url: str, name: str):
@@ -42,9 +45,60 @@ def handle_entry(url: str, name: str):
         stored_page_paths.append(fname)
         page_num += 1
 
-    print("nNow creating pdf")
+    print("\n Let's lose those stupid banners")
+    images: List[Tuple[Image.Image, int]] = []
+    for i in range(0, len(stored_page_paths)):
+        fname = stored_page_paths[i]
+        images.append((Image.open(fname), i))
 
-    pdf = FPDF()
+    assert len(images) >= 2  # i mean come on
+    height_a = images[0][0].height
+    width_a = images[0][0].width
+    i = 0
+    while i<page_num and images[i][0].width == width_a and images[i][0].height == height_a:
+        i += 1
+
+    # its also possible that all pages have the same height . in that case they changed the
+    # width to zoom out and place the banner. also fixable but not really neccessary
+    if width_a == images[i][0].width: # so the height changed
+        height_b = images[i][0].height
+        actual_height = min(height_a, height_b)
+        banner_height = max(height_a, height_b)
+        assert actual_height != banner_height  # please
+        crop_count = 0
+        for image, indx in images:
+            print(f"Iterating & Cropping  {make_progress_bar(indx,num_pages)}", end="\r")
+            if image.height == banner_height:
+                crop_count += 1
+                image = image.crop((0, 0, image.width, actual_height))
+                fname = stored_page_paths[indx]
+                image.save(fname)
+            image.close()
+        print(f"Cropped {crop_count} images!                                ")
+    elif height_a == images[i][0].height: # so the width changed
+        # here banner is at bottom and 50px high!!
+        width_b = images[i][0].width
+        banner_height = 50
+        banner_width = min(width_a,width_b)
+        crop_count = 0
+        for image,indx in images:
+            print(f"Iterating & Cropping  {make_progress_bar(indx,num_pages)}", end="\r")
+            if image.width == banner_width:
+                crop_count += 1
+                image = image.crop((0,0,image.width,image.height-banner_height))
+                fname = stored_page_paths[indx]
+                image.save(fname)
+            image.close()
+        print(f"\nCropped {crop_count} images!")
+    else:
+        for image,_ in images:
+            image.close()
+        print("Nothing to crop...")
+
+
+    print("\nNow creating pdf")
+
+    pdf = FPDF("P", "mm", (200, 300))
     page_num = 0
     for image in stored_page_paths:
         print(
@@ -54,7 +108,7 @@ def handle_entry(url: str, name: str):
         )
         pdf.add_page()
         pdf.image(
-            name=image, x=6, y=0, h=297
+            name=image, x=0, y=0, h=300
         )  # 6 is the offset needed to center the image with weird image dimensions provided
         page_num += 1
     print("\n Finishing up...")
