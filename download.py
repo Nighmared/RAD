@@ -1,3 +1,4 @@
+#! /usr/bin/env python3
 import requests
 from fpdf import FPDF
 from bs4 import BeautifulSoup as BS
