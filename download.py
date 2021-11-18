@@ -52,8 +52,7 @@ def handle_entry(url: str, name: str):
         page_file.close()
         stored_page_paths.append(fname)
         page_num += 1
-
-    print("\n Let's lose those stupid banners")
+    print("\nLet's lose those stupid banners...")
     images: List[Tuple[Image.Image, int]] = []
     for i in range(0, len(stored_page_paths)):
         fname = stored_page_paths[i]
@@ -83,7 +82,7 @@ def handle_entry(url: str, name: str):
                 fname = stored_page_paths[indx]
                 image.save(fname)
             image.close()
-        print(f"Cropped {crop_count} images!                                ")
+        print(f"\nCropped {crop_count} images!".ljust(72))
     elif height_a == images[i][0].height: # so the width changed
         # here banner is at bottom and 50px high!!
         width_b = images[i][0].width
@@ -120,10 +119,10 @@ def handle_entry(url: str, name: str):
             name=image, x=0, y=0, h=300
         )  # 6 is the offset needed to center the image with weird image dimensions provided
         page_num += 1
-    print("\n Finishing up...")
+    print("\nFinishing up...",end="\r")
     pdf.output(f"pdfs/{name}.pdf")
 
-    print(f"{name} complete!")
+    print(f"{name} complete!".ljust(20))
 
 
 if __name__ == "__main__":
