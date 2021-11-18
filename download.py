@@ -129,7 +129,7 @@ def handle_entry(url: str, name: str):
             if DEBUG: print(i)
             pdf.add_page(orientation="L")
             pdf.image(
-            name=image, x=0, y=0, w=300
+            name=image, x=0, y=0, h=200
         ) 
         else:
             pdf.add_page()
