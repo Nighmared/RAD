@@ -8,6 +8,8 @@ from typing import List
 from typing import Tuple
 
 
+DEBUG = False
+
 def main():
     try:
         with open("links.txt", "r") as file:
@@ -54,21 +56,26 @@ def handle_entry(url: str, name: str):
         stored_page_paths.append(fname)
         page_num += 1
     print("\nLet's lose those stupid banners...")
+    to_rotate_imgs = []
     images: List[Tuple[Image.Image, int]] = []
     for i in range(0, len(stored_page_paths)):
         fname = stored_page_paths[i]
-        images.append((Image.open(fname), i))
-
+        images.append((img:=Image.open(fname), i))
+        if img.width>img.height:
+            to_rotate_imgs.append(i)
     assert len(images) >= 2  # i mean come on
-    height_a = images[0][0].height
-    width_a = images[0][0].width
+    height_a = images[1][0].height
+    width_a = images[1][0].width
     i = 0
-    while i<page_num and images[i][0].width == width_a and images[i][0].height == height_a:
+    while i<len(images) and ((wdiff:=abs(images[i][0].width - width_a))<30 or wdiff>100) and ((hdiff:=abs(images[i][0].height - height_a))<50 or hdiff>200):
         i += 1
 
     # either the the pages with banners are higher and just have a 100px banner added to the bottom
     # or the width has changed and a 50px high banner is added at the bottom and the comic page just 
     # 'zoomed' out
+    if DEBUG:
+        print(images[i][1],images[i][0].size)
+        print(width_a,height_a,wdiff)
     if width_a == images[i][0].width: # so the height changed
         height_b = images[i][0].height
         actual_height = min(height_a, height_b)
@@ -76,6 +83,7 @@ def handle_entry(url: str, name: str):
         assert actual_height != banner_height  # please
         crop_count = 0
         for image, indx in images:
+            if indx in to_rotate_imgs: continue
             print(f"Iterating & Cropping  {make_progress_bar(indx,num_pages)}", end="\r")
             if image.height == banner_height:
                 crop_count += 1
@@ -91,6 +99,7 @@ def handle_entry(url: str, name: str):
         banner_width = min(width_a,width_b)
         crop_count = 0
         for image,indx in images:
+            if indx in to_rotate_imgs: continue
             print(f"Iterating & Cropping  {make_progress_bar(indx,num_pages)}", end="\r")
             if image.width == banner_width:
                 crop_count += 1
@@ -109,16 +118,24 @@ def handle_entry(url: str, name: str):
 
     pdf = FPDF("P", "mm", (200, 300)) #basically any numbers that end up with 3:2 ratio
     page_num = 0
-    for image in stored_page_paths:
+    for i in range(0,len(stored_page_paths)):
+        image = stored_page_paths[i]
         print(
             f"Adding page {str(page_num).rjust(4)}/{str(num_pages).ljust(4)} "
             + make_progress_bar(page_num, num_pages),
             end="\r",
         )
-        pdf.add_page()
-        pdf.image(
-            name=image, x=0, y=0, h=300
-        )  # 6 is the offset needed to center the image with weird image dimensions provided
+        if(i in to_rotate_imgs):
+            if DEBUG: print(i)
+            pdf.add_page(orientation="L")
+            pdf.image(
+            name=image, x=0, y=0, w=300
+        ) 
+        else:
+            pdf.add_page()
+            pdf.image(
+                name=image, x=0, y=0, h=300
+            ) 
         page_num += 1
     print("\nFinishing up...",end="\r")
     pdf.output(f"pdfs/{name}.pdf")
