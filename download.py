@@ -5,7 +5,7 @@ from os import makedirs
 
 
 def main():
-    makedirs("pdf",exist_ok=True)
+    makedirs("pdfs",exist_ok=True)
     with open("links.txt", "r") as file:
         for entry in file.readlines():
             name, link = entry.split(";")
