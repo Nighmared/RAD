@@ -8,12 +8,20 @@ from typing import Tuple
 
 
 def main():
-    makedirs("pdfs", exist_ok=True)
-    with open("links.txt", "r") as file:
-        for entry in file.readlines():
-            name, link = entry.split(";")
-            handle_entry(url=link, name=name)
-
+    try:
+        with open("links.txt", "r") as file:
+            makedirs("pdfs", exist_ok=True)
+            i = 0
+            for entry in (lines:=file.readlines()):
+                name, link = entry.split(";")
+                handle_entry(url=link, name=name)
+                i+=1
+                print(f"{i}/{len(lines)} done.")
+            if i==0:
+                print("No entries in 'links.txt'. Did nothing.")
+    except FileNotFoundError:
+        open("links.txt",'w').close()
+        print("Can't find the 'links.txt' file. I created one for you. Make sure to fill it with entries!")
 
 def make_progress_bar(current, max):
     perc = (50 * current) // max
@@ -58,8 +66,9 @@ def handle_entry(url: str, name: str):
     while i<page_num and images[i][0].width == width_a and images[i][0].height == height_a:
         i += 1
 
-    # its also possible that all pages have the same height . in that case they changed the
-    # width to zoom out and place the banner. also fixable but not really neccessary
+    # either the the pages with banners are higher and just have a 100px banner added to the bottom
+    # or the width has changed and a 50px high banner is added at the bottom and the comic page just 
+    # 'zoomed' out
     if width_a == images[i][0].width: # so the height changed
         height_b = images[i][0].height
         actual_height = min(height_a, height_b)
@@ -96,9 +105,9 @@ def handle_entry(url: str, name: str):
         print("Nothing to crop...")
 
 
-    print("\nNow creating pdf")
+    print("Now creating pdf")
 
-    pdf = FPDF("P", "mm", (200, 300))
+    pdf = FPDF("P", "mm", (200, 300)) #basically any numbers that end up with 3:2 ratio
     page_num = 0
     for image in stored_page_paths:
         print(
@@ -114,7 +123,7 @@ def handle_entry(url: str, name: str):
     print("\n Finishing up...")
     pdf.output(f"pdfs/{name}.pdf")
 
-    print(f"{name} done!")
+    print(f"{name} complete!")
 
 
 if __name__ == "__main__":
