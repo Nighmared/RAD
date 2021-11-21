@@ -7,25 +7,36 @@ from bs4 import BeautifulSoup as BS
 from fpdf import FPDF
 from PIL import Image
 
-from status import *
+from status import Status, get_status_length
 
-DEBUG = False
-PDF_H = 300
-PDF_W = 200
-PROGRESS_BAR_LEN = 50
-STATUS_LEN = get_status_length()+1
-NUM_STEPS = len(Status)
-STEP_SIZE = PROGRESS_BAR_LEN//NUM_STEPS
+__author__ = "nighmared"
+__version__ = 1.1
+
+
+DEBUG = False  # makes it more verbose
+PDF_H = 300  # Height of resulting PDF
+PDF_W = 200  # Width of resulting PDF
+# For most comics i have seen an aspect ratio of 2:3 seems to be a good call
+
+PROGRESS_BAR_LEN = 50  # lenght of the progress bar that is displayed
+STATUS_LEN = (
+    get_status_length() + 1
+)  # How much space must be accounted for the status in the progress bar
+NUM_STEPS = len(Status)  # Number of steps the program goes through
+STEP_SIZE = PROGRESS_BAR_LEN // NUM_STEPS  # equal length parts for the status bar
 
 
 def main():
+    """
+    main method that reads entries from the links.txt file and processes them one after another.
+    """
     try:
         with open("links.txt", "r") as file:
             makedirs("pdfs", exist_ok=True)
             i = 0
             lines = file.readlines()
             print(f"Found {len(lines)} Entries")
-            for entry in (lines):
+            for entry in lines:
                 name, link = entry.split(";")
                 handle_entry(url=link, name=name)
                 i += 1
@@ -38,20 +49,57 @@ def main():
         )
 
 
-def make_progress_bar(current, max,step):
-    perc = step*STEP_SIZE+ ( STEP_SIZE* current) // max
+def make_progress_bar(current: int, max: int, step: int) -> str:
+    """
+    Takes three ints as input, current and max are the values
+    that get used to compute the current progress by standard
+    percentage computation. The resulting progress bar is then
+    scaled according to the constant PROGRESS_BAR_LEN and
+    divided into NUM_STEPS. Here the last argument 'step' comes
+    into play, as it is used to determine the overall progress
+    of the script in relation to the number of steps defined
+    in the Status Enum.
+    """
+    perc = step * STEP_SIZE + (STEP_SIZE * current) // max
     return f"[{('|'*perc).ljust(PROGRESS_BAR_LEN)}]"
 
-def make_status_string(current_status, step_num, title, current_progress, max_progress):
-    res = title.ljust(40) \
-        + current_status.value.center(STATUS_LEN) \
-        + make_progress_bar(current_progress,max_progress,step_num)
+
+def make_status_string(
+    current_status: Status,
+    step_num: int,
+    title: str,
+    current_progress: int,
+    max_progress: int,
+) -> str:
+    """
+    Takes an instance of the Status enum that represents what the script is currently doing
+    as well as an int step_num that represents the progress of the script (e.g. the i-th step in the overall process).
+    Additionally the title of the comic that is currently processed as well as the two measures that are actually used for the
+    creation of the progress bar (current_progress & max_progress).
+    """
+    res = (
+        title.ljust(40)
+        + current_status.value.center(STATUS_LEN)
+        + make_progress_bar(current_progress, max_progress, step_num)
+    )
     return res
 
-def handle_entry(url: str, name: str):
+
+def handle_entry(url: str, name: str) -> None:
+    """
+    takes the url of a comic as well as the name that should
+    be displayed in the progress bar and under which the final pdf
+    is going to be stored.
+    First all images for the current comic are downloaded, then the script
+    takes a best-effort approach to removing all readallcomics.com banners[1] and finally
+    the pages are put together in a uniform format and exported as a pdf.
+
+    [1] This is really not mainly to get rid of the credit to the site but to ensure that
+        all pages of the comic have a uniform aspect ratio.
+    """
     url = url.strip()
     name = name.strip()
-    makedirs(f"imgs/{name}", exist_ok=True)
+    makedirs(f"imgs/{name.replace(' ','_')}", exist_ok=True)
     base = requests.get(url)
     base.close()
     soup = BS(base.content, "html.parser")
@@ -60,7 +108,10 @@ def handle_entry(url: str, name: str):
     page_num = 0
     stored_page_paths = []
     for page in pages:
-        print(make_status_string(Status.DOWNLOADING,0,name, page_num,num_pages),end="\r")
+        print(
+            make_status_string(Status.DOWNLOADING, 0, name, page_num, num_pages),
+            end="\r",
+        )
         with requests.Session() as s:
             response = requests.get(page["src"])
         fname = f"imgs/{name}/{page_num}.jpg"
@@ -100,14 +151,17 @@ def handle_entry(url: str, name: str):
         assert actual_height != banner_height  # please
         crop_count = 0
         for image, indx in images:
-            print(make_status_string(Status.CROPPING,1,name,indx,num_pages),end="\r")
+            print(
+                make_status_string(Status.CROPPING, 1, name, indx, num_pages), end="\r"
+            )
             if image.height == banner_height:
                 crop_count += 1
                 image = image.crop((0, 0, image.width, actual_height))
                 fname = stored_page_paths[indx]
                 image.save(fname)
             image.close()
-        if DEBUG: print(f"\nCropped {crop_count} images!".ljust(72))
+        if DEBUG:
+            print(f"\nCropped {crop_count} images!".ljust(72))
     elif height_a == images[i][0].height:  # so the width changed
         # here banner is at bottom and 50px high!!
         width_b = images[i][0].width
@@ -117,19 +171,22 @@ def handle_entry(url: str, name: str):
         for image, indx in images:
             if indx in to_rotate_imgs:
                 continue
-            print(make_status_string(Status.CROPPING,1,name,indx,num_pages),end="\r")
+            print(
+                make_status_string(Status.CROPPING, 1, name, indx, num_pages), end="\r"
+            )
             if image.width == banner_width:
                 crop_count += 1
                 image = image.crop((0, 0, image.width, image.height - banner_height))
                 fname = stored_page_paths[indx]
                 image.save(fname)
             image.close()
-        if DEBUG: print(f"\nCropped {crop_count} images!")
+        if DEBUG:
+            print(f"\nCropped {crop_count} images!")
     else:
         for image, _ in images:
             image.close()
-        if DEBUG: print("Nothing to crop...")
-
+        if DEBUG:
+            print("Nothing to crop...")
 
     pdf = FPDF("P", "mm", (PDF_W, PDF_H))
     page_num = 0
@@ -139,7 +196,7 @@ def handle_entry(url: str, name: str):
     # hence the offset to at least keep it centered
     for i in range(0, len(stored_page_paths)):
         image = stored_page_paths[i]
-        print(make_status_string(Status.ADDING_PAGES,2,name,i,num_pages),end="\r")
+        print(make_status_string(Status.ADDING_PAGES, 2, name, i, num_pages), end="\r")
         if i in to_rotate_imgs:
             if DEBUG:
                 print(i)
@@ -149,10 +206,9 @@ def handle_entry(url: str, name: str):
             pdf.add_page()
             pdf.image(name=image, x=0, y=0, h=PDF_H)
         page_num += 1
-    print(make_status_string(Status.EXPORTING,3,name,0,1),end="\r")
+    print(make_status_string(Status.EXPORTING, 3, name, 0, 1), end="\r")
     pdf.output(f"pdfs/{name}.pdf")
-    print(make_status_string(Status.COMPLETE,4,name,1,1))
-
+    print(make_status_string(Status.COMPLETE, 4, name, 1, 1))
 
 
 if __name__ == "__main__":

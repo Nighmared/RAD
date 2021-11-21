@@ -7,7 +7,10 @@ class Status(Enum):
     EXPORTING = "Exporting PDF"
     COMPLETE = "Complete!"
 
-def get_status_length():
+def get_status_length()->int:
+    """
+    returns length of the longest Status string
+    """
     res = 0
     for s in Status:
         res = max(res,len(s.value))
