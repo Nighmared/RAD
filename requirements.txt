@@ -1,5 +1,5 @@
-beautifulsoup4
-fpdf
-Pillow
-requests
+beautifulsoup4>=4.9.3
+fpdf>=1.7.2
+Pillow>=8.3.2
+requests>=2.26.0
 
