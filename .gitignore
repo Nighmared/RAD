@@ -2,3 +2,4 @@
 *.jpg
 *.txt
 links_old.txt
+__pycache__/*
