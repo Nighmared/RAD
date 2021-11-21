@@ -10,7 +10,7 @@ from PIL import Image
 from status import Status, get_status_length
 
 __author__ = "nighmared"
-__version__ = 1.1
+__version__ = 1.21
 
 
 DEBUG = False  # makes it more verbose
