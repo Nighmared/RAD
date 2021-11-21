@@ -53,6 +53,7 @@ def handle_entry(url: str, name: str):
     name = name.strip()
     makedirs(f"imgs/{name}", exist_ok=True)
     base = requests.get(url)
+    base.close()
     soup = BS(base.content, "html.parser")
     pages = soup.find_all("img", {"width": "1000px"})
     num_pages = len(pages) - 1
@@ -60,7 +61,8 @@ def handle_entry(url: str, name: str):
     stored_page_paths = []
     for page in pages:
         print(make_status_string(Status.DOWNLOADING,0,name, page_num,num_pages),end="\r")
-        response = requests.get(page["src"])
+        with requests.Session() as s:
+            response = requests.get(page["src"])
         fname = f"imgs/{name}/{page_num}.jpg"
         page_file = open(fname, "wb")
         page_file.write(response.content)
