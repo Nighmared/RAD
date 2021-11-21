@@ -49,7 +49,7 @@ Ruins of the Empire Part Three ; http://readallcomics.com/legend-of-korra-ruins-
 
 
 #### Bonus: Additionally here the formatted content for links.txt to download all avatar comics:
-https://pastebin.com/A8rvFtK7
+https://pastebin.com/yN4rU8tE
 
 
 
