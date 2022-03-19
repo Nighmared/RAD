@@ -1,13 +1,19 @@
 #! /usr/bin/env python3
+"""
+Program to automatically download comics from
+readallcomics.com. Outputs whole comics collected
+into one pdf per comic with automatic scaling and
+advertisement removal, also rotates landscape pages
+automatically
+"""
 from os import makedirs
-from typing import List, Tuple
 
 import requests
 from bs4 import BeautifulSoup as BS
 from fpdf import FPDF
 from PIL import Image
 
-from status import Status, get_status_length
+from status.status import Status, get_status_length
 
 __author__ = "nighmared"
 __version__ = 1.21
@@ -43,13 +49,15 @@ def main():
             if i == 0:
                 print("No entries in 'links.txt'. Did nothing.")
     except FileNotFoundError:
-        open("links.txt", "w").close()
+        with open("links.txt", "w"):
+            pass
         print(
-            "Can't find the 'links.txt' file. I created one for you. Make sure to fill it with entries!"
+            "Can't find the 'links.txt' file. I created one for you.\
+                 Make sure to fill it with entries!"
         )
 
 
-def make_progress_bar(current: int, max: int, step: int) -> str:
+def make_progress_bar(current: int, max_len: int, step: int) -> str:
     """
     Takes three ints as input, current and max are the values
     that get used to compute the current progress by standard
@@ -60,7 +68,7 @@ def make_progress_bar(current: int, max: int, step: int) -> str:
     of the script in relation to the number of steps defined
     in the Status Enum.
     """
-    perc = step * STEP_SIZE + (STEP_SIZE * current) // max
+    perc = step * STEP_SIZE + (STEP_SIZE * current) // max_len
     return f"[{('|'*perc).ljust(PROGRESS_BAR_LEN)}]"
 
 
@@ -73,9 +81,10 @@ def make_status_string(
 ) -> str:
     """
     Takes an instance of the Status enum that represents what the script is currently doing
-    as well as an int step_num that represents the progress of the script (e.g. the i-th step in the overall process).
-    Additionally the title of the comic that is currently processed as well as the two measures that are actually used for the
-    creation of the progress bar (current_progress & max_progress).
+    as well as an int step_num that represents the progress of the script (e.g. the i-th
+    step in the overall process). Additionally the title of the comic that is currently
+    processed as well as the two measures that are actually used for the creation of the
+    progress bar (current_progress & max_progress).
     """
     res = (
         title.ljust(40)
@@ -112,18 +121,17 @@ def handle_entry(url: str, name: str) -> None:
             make_status_string(Status.DOWNLOADING, 0, name, page_num, num_pages),
             end="\r",
         )
-        with requests.Session() as s:
+        with requests.Session():
             response = requests.get(page["src"])
         fname = f"imgs/{name}/{page_num}.jpg"
-        page_file = open(fname, "wb")
-        page_file.write(response.content)
-        page_file.close()
+        with open(fname, "wb") as page_file:
+            page_file.write(response.content)
         stored_page_paths.append(fname)
         page_num += 1
     to_rotate_imgs = []
-    images: List[Tuple[Image.Image, int]] = []
-    for i in range(0, len(stored_page_paths)):
-        fname = stored_page_paths[i]
+    images: list[tuple[Image.Image, int]] = []
+    for i, path in enumerate(stored_page_paths):
+        fname = path
         images.append((img := Image.open(fname), i))
         if img.width > img.height:
             to_rotate_imgs.append(i)
@@ -190,12 +198,13 @@ def handle_entry(url: str, name: str) -> None:
 
     pdf = FPDF("P", "mm", (PDF_W, PDF_H))
     page_num = 0
-    landscape_offset_x = (
-        PDF_H - PDF_W * (4 / 3)
-    ) / 2  # so far the pages that were landscape oriented had an aspect ratio of 4:3. Doesn't fit the usual page
+    # so far the pages that were landscape oriented
+    # had an aspect ratio of 4:3. Doesn't fit the usual page
     # hence the offset to at least keep it centered
-    for i in range(0, len(stored_page_paths)):
-        image = stored_page_paths[i]
+    landscape_offset_x = (PDF_H - PDF_W * (4 / 3)) / 2
+
+    for i, stored_path in enumerate(stored_page_paths):
+        image = stored_path
         print(make_status_string(Status.ADDING_PAGES, 2, name, i, num_pages), end="\r")
         if i in to_rotate_imgs:
             if DEBUG:
