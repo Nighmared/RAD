@@ -3,3 +3,4 @@
 *.txt
 links_old.txt
 __pycache__/*
+.vscode/
