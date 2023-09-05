@@ -29,25 +29,20 @@ STATUS_LEN = (
     get_status_length() + 1
 )  # How much space must be accounted for the status in the progress bar
 NUM_STEPS = len(Status)  # Number of steps the program goes through
-STEP_SIZE = PROGRESS_BAR_LEN // NUM_STEPS  # equal length parts for the status bar
+STEP_SIZE = (
+    PROGRESS_BAR_LEN // NUM_STEPS
+)  # equal length parts for the status bar
 
 
 def main():
     """
     main method that reads entries from the links.txt file and processes them one after another.
     """
+    lines = []
     try:
         with open("links.txt", "r") as file:
             makedirs("pdfs", exist_ok=True)
-            i = 0
             lines = file.readlines()
-            print(f"Found {len(lines)} Entries")
-            for entry in lines:
-                name, link = entry.split(";")
-                handle_entry(url=link, name=name)
-                i += 1
-            if i == 0:
-                print("No entries in 'links.txt'. Did nothing.")
     except FileNotFoundError:
         with open("links.txt", "w"):
             pass
@@ -55,6 +50,14 @@ def main():
             "Can't find the 'links.txt' file. I created one for you.\
                  Make sure to fill it with entries!"
         )
+    print(f"Found {len(lines)} Entries")
+    i = 0
+    for entry in lines:
+        name, link = entry.split(";")
+        handle_entry(url=link, name=name)
+        i += 1
+    if i == 0:
+        print("No entries in 'links.txt'. Did nothing.")
 
 
 def make_progress_bar(current: int, max_len: int, step: int) -> str:
@@ -108,22 +111,26 @@ def handle_entry(url: str, name: str) -> None:
     """
     url = url.strip()
     name = name.strip()
-    makedirs(f"imgs/{name.replace(' ','_')}", exist_ok=True)
+    clean_name = name.replace(" ", "_")
+    makedirs(f"imgs/{clean_name}", exist_ok=True)
     base = requests.get(url)
     base.close()
     soup = BS(base.content, "html.parser")
-    pages = soup.find_all("img", {"width": "1000px"})
+    # pages = soup.find_all("img", {"width": "1000px"})
+    pages = soup.select("center center div img")
     num_pages = len(pages) - 1
     page_num = 0
     stored_page_paths = []
     for page in pages:
         print(
-            make_status_string(Status.DOWNLOADING, 0, name, page_num, num_pages),
+            make_status_string(
+                Status.DOWNLOADING, 0, name, page_num, num_pages
+            ),
             end="\r",
         )
         with requests.Session():
             response = requests.get(page["src"])
-        fname = f"imgs/{name}/{page_num}.jpg"
+        fname = f"imgs/{clean_name}/{page_num}.jpg"
         with open(fname, "wb") as page_file:
             page_file.write(response.content)
         stored_page_paths.append(fname)
@@ -135,7 +142,9 @@ def handle_entry(url: str, name: str) -> None:
         images.append((img := Image.open(fname), i))
         if img.width > img.height:
             to_rotate_imgs.append(i)
-    assert len(images) >= 2  # i mean come on
+    assert (
+        len(images) >= 2
+    )  # if (almost) no images are returned something has to be wrong
     height_a = images[1][0].height
     width_a = images[1][0].width
     i = 0
@@ -160,7 +169,8 @@ def handle_entry(url: str, name: str) -> None:
         crop_count = 0
         for image, indx in images:
             print(
-                make_status_string(Status.CROPPING, 1, name, indx, num_pages), end="\r"
+                make_status_string(Status.CROPPING, 1, name, indx, num_pages),
+                end="\r",
             )
             if image.height == banner_height:
                 crop_count += 1
@@ -180,11 +190,14 @@ def handle_entry(url: str, name: str) -> None:
             if indx in to_rotate_imgs:
                 continue
             print(
-                make_status_string(Status.CROPPING, 1, name, indx, num_pages), end="\r"
+                make_status_string(Status.CROPPING, 1, name, indx, num_pages),
+                end="\r",
             )
             if image.width == banner_width:
                 crop_count += 1
-                image = image.crop((0, 0, image.width, image.height - banner_height))
+                image = image.crop(
+                    (0, 0, image.width, image.height - banner_height)
+                )
                 fname = stored_page_paths[indx]
                 image.save(fname)
             image.close()
@@ -205,7 +218,10 @@ def handle_entry(url: str, name: str) -> None:
 
     for i, stored_path in enumerate(stored_page_paths):
         image = stored_path
-        print(make_status_string(Status.ADDING_PAGES, 2, name, i, num_pages), end="\r")
+        print(
+            make_status_string(Status.ADDING_PAGES, 2, name, i, num_pages),
+            end="\r",
+        )
         if i in to_rotate_imgs:
             if DEBUG:
                 print(i)
