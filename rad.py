@@ -6,6 +6,7 @@ into one pdf per comic with automatic scaling and
 advertisement removal, also rotates landscape pages
 automatically
 """
+import time
 from os import makedirs
 
 import requests
@@ -29,14 +30,13 @@ STATUS_LEN = (
     get_status_length() + 1
 )  # How much space must be accounted for the status in the progress bar
 NUM_STEPS = len(Status)  # Number of steps the program goes through
-STEP_SIZE = (
-    PROGRESS_BAR_LEN // NUM_STEPS
-)  # equal length parts for the status bar
+STEP_SIZE = PROGRESS_BAR_LEN // NUM_STEPS  # equal length parts for the status bar
 
 
 def main():
     """
-    main method that reads entries from the links.txt file and processes them one after another.
+    main method that reads entries from the links.txt file and processes
+    them one after another.
     """
     lines = []
     try:
@@ -83,11 +83,12 @@ def make_status_string(
     max_progress: int,
 ) -> str:
     """
-    Takes an instance of the Status enum that represents what the script is currently doing
-    as well as an int step_num that represents the progress of the script (e.g. the i-th
-    step in the overall process). Additionally the title of the comic that is currently
-    processed as well as the two measures that are actually used for the creation of the
-    progress bar (current_progress & max_progress).
+    Takes an instance of the Status enum that represents what the
+    script is currently doing as well as an int step_num that represents
+    the progress of the script (e.g. the i-th step in the overall process).
+    Additionally the title of the comic that is currently processed as well
+    as the two measures that are actually used for the creation of the progress
+    bar (current_progress & max_progress).
     """
     res = (
         title.ljust(40)
@@ -103,11 +104,12 @@ def handle_entry(url: str, name: str) -> None:
     be displayed in the progress bar and under which the final pdf
     is going to be stored.
     First all images for the current comic are downloaded, then the script
-    takes a best-effort approach to removing all readallcomics.com banners[1] and finally
-    the pages are put together in a uniform format and exported as a pdf.
-
-    [1] This is really not mainly to get rid of the credit to the site but to ensure that
-        all pages of the comic have a uniform aspect ratio.
+    takes a best-effort approach to removing all readallcomics.com banners[1]
+    and finally the pages are put together in a uniform format and exported
+    as a pdf.
+    [1] This is really not mainly to get rid of the credit
+    to the site but to ensure that all pages of the comic have
+    a uniform aspect ratio.
     """
     url = url.strip()
     name = name.strip()
@@ -123,18 +125,20 @@ def handle_entry(url: str, name: str) -> None:
     stored_page_paths = []
     for page in pages:
         print(
-            make_status_string(
-                Status.DOWNLOADING, 0, name, page_num, num_pages
-            ),
+            make_status_string(Status.DOWNLOADING, 0, name, page_num, num_pages),
             end="\r",
         )
         with requests.Session():
-            response = requests.get(page["src"])
+            source = page["src"]
+            if isinstance(source, list):
+                raise AttributeError("Image can't have more than one source")
+            response = requests.get(source)
         fname = f"imgs/{clean_name}/{page_num}.jpg"
         with open(fname, "wb") as page_file:
             page_file.write(response.content)
         stored_page_paths.append(fname)
         page_num += 1
+        time.sleep(0.2)
     to_rotate_imgs = []
     images: list[tuple[Image.Image, int]] = []
     for i, path in enumerate(stored_page_paths):
@@ -148,20 +152,23 @@ def handle_entry(url: str, name: str) -> None:
     height_a = images[1][0].height
     width_a = images[1][0].width
     i = 0
+    wdiff = 0
+    hdiff = 0
     while (
         i < len(images)
         and ((wdiff := abs(images[i][0].width - width_a)) < 30 or wdiff > 100)
-        and ((hdiff := abs(images[i][0].height - height_a)) < 50 or hdiff > 200)
+        and ((hdiff := abs(images[i][0].height - height_a)) < 50 or hdiff > 200)  #
     ):
         i += 1
 
-    # either the the pages with banners are higher and just have a 100px banner added to the bottom
-    # or the width has changed and a 50px high banner is added at the bottom and the comic page just
-    # 'zoomed' out
+    # either the the pages with banners are higher and just
+    #  have a 100px banner added to the bottom
+    # or the width has changed and a 50px high banner is added at the
+    # bottom and the comic page just 'zoomed' out
     if DEBUG:
         print(images[i][1], images[i][0].size)
         print(width_a, height_a, wdiff)
-    if width_a == images[i][0].width:  # so the height changed
+    if i < len(images) and width_a == images[i][0].width:  # so the height changed
         height_b = images[i][0].height
         actual_height = min(height_a, height_b)
         banner_height = max(height_a, height_b)
@@ -180,7 +187,7 @@ def handle_entry(url: str, name: str) -> None:
             image.close()
         if DEBUG:
             print(f"\nCropped {crop_count} images!".ljust(72))
-    elif height_a == images[i][0].height:  # so the width changed
+    elif i < len(images) and height_a == images[i][0].height:  # so the width changed
         # here banner is at bottom and 50px high!!
         width_b = images[i][0].width
         banner_height = 50
@@ -195,9 +202,7 @@ def handle_entry(url: str, name: str) -> None:
             )
             if image.width == banner_width:
                 crop_count += 1
-                image = image.crop(
-                    (0, 0, image.width, image.height - banner_height)
-                )
+                image = image.crop((0, 0, image.width, image.height - banner_height))
                 fname = stored_page_paths[indx]
                 image.save(fname)
             image.close()
