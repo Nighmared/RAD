@@ -17,7 +17,10 @@ from PIL import Image
 from status.status import Status, get_status_length
 
 __author__ = "nighmared"
-__version__ = 1.21
+__version__ = 1.24
+
+
+IMAGE_SELECTOR = "div center p img"  # 20.1.2026 - changed to new selector :) lets see how long it holds
 
 
 DEBUG = False  # makes it more verbose
@@ -40,11 +43,11 @@ def main():
     """
     lines = []
     try:
-        with open("links.txt", "r") as file:
+        with open("links.txt", "r", encoding="utf-8") as file:
             makedirs("pdfs", exist_ok=True)
             lines = file.readlines()
     except FileNotFoundError:
-        with open("links.txt", "w"):
+        with open("links.txt", "w", encoding="utf-8"):
             pass
         print(
             "Can't find the 'links.txt' file. I created one for you.\
@@ -115,11 +118,10 @@ def handle_entry(url: str, name: str) -> None:
     name = name.strip()
     clean_name = name.replace(" ", "_")
     makedirs(f"imgs/{clean_name}", exist_ok=True)
-    base = requests.get(url)
+    base = requests.get(url, timeout=3)
     base.close()
     soup = BS(base.content, "html.parser")
-    # pages = soup.find_all("img", {"width": "1000px"})
-    pages = soup.select("center center div img")
+    pages = soup.select(IMAGE_SELECTOR)
     num_pages = len(pages) - 1
     page_num = 0
     stored_page_paths = []
@@ -132,13 +134,15 @@ def handle_entry(url: str, name: str) -> None:
             source = page["src"]
             if isinstance(source, list):
                 raise AttributeError("Image can't have more than one source")
-            response = requests.get(source)
+            response = requests.get(source, timeout=3)
         fname = f"imgs/{clean_name}/{page_num}.jpg"
         with open(fname, "wb") as page_file:
             page_file.write(response.content)
         stored_page_paths.append(fname)
         page_num += 1
-        time.sleep(0.2)
+        time.sleep(0.2)  # desparate attempt at trying to not get rate limited >.<
+
+    # check whether there are pages that need to be rotated
     to_rotate_imgs = []
     images: list[tuple[Image.Image, int]] = []
     for i, path in enumerate(stored_page_paths):
@@ -146,14 +150,24 @@ def handle_entry(url: str, name: str) -> None:
         images.append((img := Image.open(fname), i))
         if img.width > img.height:
             to_rotate_imgs.append(i)
-    assert (
-        len(images) >= 2
-    )  # if (almost) no images are returned something has to be wrong
+
+    # if (almost) no images are returned something has to be wrong
+    assert len(images) >= 2, (
+        "The html structure on the website has probably changed,"
+        + " please open an issue on https://github.com/nighmared/rad"
+    )
+
     height_a = images[1][0].height
     width_a = images[1][0].width
     i = 0
     wdiff = 0
     hdiff = 0
+
+    # try to find first page with an advertising banner added
+    # either the the pages with banners are higher and just
+    #  have a 100px banner added to the bottom
+    # or the width has changed and a 50px high banner is added at the
+    # bottom and the comic page just 'zoomed' out
     while (
         i < len(images)
         and ((wdiff := abs(images[i][0].width - width_a)) < 30 or wdiff > 100)
@@ -161,13 +175,13 @@ def handle_entry(url: str, name: str) -> None:
     ):
         i += 1
 
-    # either the the pages with banners are higher and just
-    #  have a 100px banner added to the bottom
-    # or the width has changed and a 50px high banner is added at the
-    # bottom and the comic page just 'zoomed' out
     if DEBUG:
         print(images[i][1], images[i][0].size)
         print(width_a, height_a, wdiff)
+
+    # found banner-ed page, now we know the size of banner page,
+    # go through all images and crop the ones that have banner size
+
     if i < len(images) and width_a == images[i][0].width:  # so the height changed
         height_b = images[i][0].height
         actual_height = min(height_a, height_b)
@@ -215,10 +229,17 @@ def handle_entry(url: str, name: str) -> None:
             print("Nothing to crop...")
 
     pdf = FPDF("P", "mm", (PDF_W, PDF_H))
-    page_num = 0
     # so far the pages that were landscape oriented
     # had an aspect ratio of 4:3. Doesn't fit the usual page
     # hence the offset to at least keep it centered
+
+    # addition 2026-01-20:
+    # this computation is verified correct (again probably)
+    # stretch a w/h=4/3 rectangle on a w/h=3/2 (because rotated page)
+    # rectangle such that the height fills the page
+    # the `landscape_offset_x` is how much space will remain horizontally
+    # on either side when the smaller and scaled rectangle is centered on
+    # on the bigger one
     landscape_offset_x = (PDF_H - PDF_W * (4 / 3)) / 2
 
     for i, stored_path in enumerate(stored_page_paths):
@@ -235,7 +256,6 @@ def handle_entry(url: str, name: str) -> None:
         else:
             pdf.add_page()
             pdf.image(name=image, x=0, y=0, h=PDF_H)
-        page_num += 1
     print(make_status_string(Status.EXPORTING, 3, name, 0, 1), end="\r")
     pdf.output(f"pdfs/{name}.pdf")
     print(make_status_string(Status.COMPLETE, 4, name, 1, 1))
