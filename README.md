@@ -45,7 +45,12 @@ Ruins of the Empire Part Three ; http://readallcomics.com/legend-of-korra-ruins-
 
 ![](./docs/output.png)
 
+## Troubleshooting
 
+If you see an `AssertionError` complaining about the length of an `images` list, 
+there is a good chance that the html structure on readallcomics has changed and the
+script can't find the pages anymore, please open an issue here and if you feel like it try to
+figure out a new selector path
 
 
 #### Bonus: Additionally here the formatted content for links.txt to download all avatar comics:
